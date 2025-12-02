@@ -80,6 +80,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Setup event listeners
     setupEventListeners();
+    
+    // Prevent zoom on input focus for mobile
+    setupMobileOptimizations();
 });
 
 // Load data from localStorage
@@ -121,6 +124,49 @@ function setupEventListeners() {
     
     // Input validation
     elements.soldEggs.addEventListener('input', validateStock);
+    
+    // Handle Enter key in forms
+    elements.soldEggs.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            elements.eggPrice.focus();
+        }
+    });
+    
+    elements.eggPrice.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            elements.givenAmount.focus();
+        }
+    });
+    
+    elements.givenAmount.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            handleSale();
+        }
+    });
+    
+    elements.newInventory.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            handleAddInventory();
+        }
+    });
+}
+
+// Setup mobile optimizations
+function setupMobileOptimizations() {
+    // Prevent zoom on input focus
+    const inputs = document.querySelectorAll('input');
+    inputs.forEach(input => {
+        input.setAttribute('inputmode', 'decimal');
+    });
+    
+    // Handle viewport height for mobile browsers
+    function setViewportProperty() {
+        let vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+    }
+    
+    window.addEventListener('resize', setViewportProperty);
+    setViewportProperty();
 }
 
 // Set active section
@@ -141,9 +187,9 @@ function validateStock() {
     const eggsToSell = parseFloat(elements.soldEggs.value) || 0;
     const remainingEggs = appState.totalEggs - appState.soldEggs;
     
-    if (eggsToSell > remainingEggs) {
+    if (eggsToSell > remainingEggs && remainingEggs >= 0) {
         elements.stockWarning.classList.remove('hidden');
-        elements.remainingCount.textContent = remainingEggs;
+        elements.remainingCount.textContent = remainingEggs.toLocaleString();
     } else {
         elements.stockWarning.classList.add('hidden');
     }
@@ -157,7 +203,7 @@ function handleSale() {
     
     // Check if we have enough eggs
     const remainingEggs = appState.totalEggs - appState.soldEggs;
-    if (soldEggs > remainingEggs) {
+    if (soldEggs > remainingEggs && remainingEggs >= 0) {
         alert("Omborda yetarli tuxum yo'q!");
         return;
     }
@@ -276,6 +322,13 @@ function showResults(result) {
     }
     
     elements.results.classList.remove('hidden');
+    
+    // Auto hide results after 10 seconds on mobile
+    setTimeout(() => {
+        if (window.innerWidth < 768) {
+            elements.results.classList.add('hidden');
+        }
+    }, 10000);
 }
 
 // Reset calculation form
@@ -285,11 +338,15 @@ function resetForm() {
     elements.givenAmount.value = '';
     elements.results.classList.add('hidden');
     elements.stockWarning.classList.add('hidden');
+    elements.soldEggs.focus();
 }
 
 // Toggle add inventory form
 function toggleAddInventoryForm() {
     elements.addInventoryForm.classList.toggle('hidden');
+    if (!elements.addInventoryForm.classList.contains('hidden')) {
+        elements.newInventory.focus();
+    }
 }
 
 // Hide add inventory form
@@ -311,14 +368,23 @@ function handleAddInventory() {
         
         // Hide form and reset
         hideAddInventoryForm();
+        
+        // Show success message
+        if (window.innerWidth < 768) {
+            alert(`${amount.toLocaleString()} dona tuxum omborga qo'shildi!`);
+        }
+    } else {
+        alert("Iltimos, to'g'ri miqdor kiriting!");
     }
 }
 
 // Remove a debt
 function removeDebt(id) {
-    appState.debts = appState.debts.filter(debt => debt.id !== id);
-    saveData();
-    render();
+    if (confirm("Haqiqatan ham bu qarzni o'chirmoqchimisiz?")) {
+        appState.debts = appState.debts.filter(debt => debt.id !== id);
+        saveData();
+        render();
+    }
 }
 
 // Render the application UI
@@ -348,7 +414,7 @@ function render() {
     
     // Show/hide warnings
     const isLowStock = stockPercentage < 20 && stockPercentage > 0;
-    const isOutOfStock = remainingEggs === 0;
+    const isOutOfStock = remainingEggs <= 0 && appState.totalEggs > 0;
     
     if (isLowStock) {
         elements.lowStockWarning.classList.remove('hidden');
